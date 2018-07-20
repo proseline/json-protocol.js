@@ -1,0 +1,32 @@
+{
+  "name": "encrypted-json-protocol",
+  "version": "0.0.0",
+  "description": "create Node.js steams for encrypted, JSON-message protocols",
+  "author": "Kyle E. Mitchell <kyle@kemitchell.com> (https://kemitchell.com/)",
+  "repository": "proseline/encrypted-json-protocol.js",
+  "devDependencies": {
+    "ajv": "^6.5.2",
+    "duplexify": "^3.6.0",
+    "husky": "^0.14.3",
+    "lint-staged": "^7.2.0",
+    "prettier": "^1.13.7",
+    "sodium-universal": "^2.0.0",
+    "tape": "^4.9.1",
+    "through2": "^2.0.3"
+  },
+  "dependencies": {
+    "inherits": "^2.0.3",
+    "length-prefixed-stream": "^1.6.0"
+  },
+  "scripts": {
+    "test": "node test.js",
+    "precommit": "lint-staged",
+    "format": "prettier --write '**/*.{js,json,md}'"
+  },
+  "lint-staged": {
+    "*.{js,json,md}": [
+      "prettier --write",
+      "git add"
+    ]
+  }
+}
