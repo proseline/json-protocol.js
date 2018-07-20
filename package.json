@@ -9,6 +9,7 @@
     "ajv": "^6.5.2",
     "duplexify": "^3.6.0",
     "husky": "^0.14.3",
+    "istanbul": "^0.4.5",
     "lint-staged": "^7.2.0",
     "prettier": "^1.13.7",
     "sodium-universal": "^2.0.0",
@@ -20,6 +21,8 @@
     "length-prefixed-stream": "^1.6.0"
   },
   "scripts": {
+    "coverage": "istanbul cover -- test.js",
+    "postcoverage": "istanbul check",
     "test": "node test.js",
     "precommit": "lint-staged",
     "format": "prettier --write '**/*.{js,json,md}'"
