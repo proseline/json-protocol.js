@@ -193,6 +193,11 @@ module.exports = function(options) {
     var prefix = parsed[0];
     var body = parsed[1];
     if (prefix === 0 && validHandshake(body)) {
+      if (version !== body.version) {
+        var error = new Error("version mismatch");
+        error.version = body.version;
+        return callback(error);
+      }
       if (!this._receivingCipher) {
         this._receivingNonce = Buffer.from(body.nonce, "hex");
         assert.equal(this._receivingNonce.byteLength, STREAM_NONCEBYTES);
