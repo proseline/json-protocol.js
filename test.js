@@ -2,31 +2,30 @@ var makeProtocol = require("./");
 var sodium = require("sodium-universal");
 var tape = require("tape");
 
+var FruitProtocol = makeProtocol({
+  version: 1,
+  messages: {
+    apple: {
+      schema: {
+        type: "string",
+        const: "apple"
+      }
+    },
+    orange: {
+      schema: {
+        type: "string",
+        const: "orange"
+      }
+    }
+  }
+});
+
 tape("apple and orange", function(test) {
   test.plan(8);
 
-  var Protocol = makeProtocol({
-    version: 1,
-    messages: {
-      apple: {
-        schema: {
-          type: "string",
-          const: "apple"
-        }
-      },
-      orange: {
-        schema: {
-          type: "string",
-          const: "orange"
-        }
-      }
-    }
-  });
+  var replicationKey = randomReplicationKey();
 
-  var replicationKey = Buffer.alloc(32);
-  sodium.randombytes_buf(replicationKey);
-
-  var anna = Protocol({ replicationKey });
+  var anna = FruitProtocol({ replicationKey });
   anna.handshake(function(error) {
     test.ifError(error, "anna sent handshake");
   });
@@ -40,7 +39,7 @@ tape("apple and orange", function(test) {
     });
   });
 
-  var bob = Protocol({ replicationKey });
+  var bob = FruitProtocol({ replicationKey });
   bob.handshake(function(error) {
     test.ifError(error, "bob sent handshake");
   });
@@ -70,8 +69,7 @@ tape("version conflict", function(test) {
     messages: { howdy: { schema: { type: "string", const: "howdy" } } }
   });
 
-  var replicationKey = Buffer.alloc(32);
-  sodium.randombytes_buf(replicationKey);
+  var replicationKey = randomReplicationKey();
 
   var anna = Version1({ replicationKey }).once("error", function(error) {
     test.equal(error.message, "version mismatch");
@@ -93,20 +91,18 @@ tape("version conflict", function(test) {
 });
 
 tape("invalid message", function(test) {
-  var Protocol = makeProtocol({
-    version: 1,
-    messages: { apple: { schema: { type: "string", const: "apple" } } }
-  });
-
-  var replicationKey = Buffer.alloc(32);
-  sodium.randombytes_buf(replicationKey);
-
-  var anna = Protocol({ replicationKey });
+  var replicationKey = randomReplicationKey();
+  var anna = FruitProtocol({ replicationKey });
   test.throws(function() {
     anna.apple("orange", function() {
       /* pass */
     });
   }, "invalid apple");
-
   test.end();
 });
+
+function randomReplicationKey() {
+  var key = Buffer.alloc(32);
+  sodium.randombytes_buf(key);
+  return key;
+}
