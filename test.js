@@ -56,6 +56,36 @@ tape("apple and orange", function(test) {
   anna.pipe(bob).pipe(anna);
 });
 
+tape("multiple messages", function(test) {
+  test.plan(6);
+
+  var replicationKey = randomReplicationKey();
+
+  var anna = FruitProtocol({ replicationKey });
+  anna.handshake(function(error) {
+    test.ifError(error, "anna sent handshake");
+    anna.on("apple", function() {
+      test.pass("anna received apple");
+    });
+    anna.on("orange", function() {
+      test.pass("anna received orange");
+    });
+  });
+
+  var bob = FruitProtocol({ replicationKey });
+  bob.handshake(function(error) {
+    test.ifError(error, "bob sent handshake");
+    bob.apple("apple", function(error) {
+      test.ifError(error, "bob sent handshake");
+    });
+    bob.orange("orange", function(error) {
+      test.ifError(error, "bob sent handshake");
+    });
+  });
+
+  anna.pipe(bob).pipe(anna);
+});
+
 tape("version conflict", function(test) {
   test.plan(6);
 
@@ -88,6 +118,18 @@ tape("version conflict", function(test) {
   });
 
   anna.pipe(bob).pipe(anna);
+});
+
+tape("double handshake", function(test) {
+  var replicationKey = randomReplicationKey();
+  var anna = FruitProtocol({ replicationKey });
+  anna.handshake(function(error) {
+    test.ifError(error);
+    anna.handshake(function(error) {
+      test.equal(error.message, "already sent handshake");
+      test.end();
+    });
+  });
 });
 
 tape("invalid message", function(test) {
