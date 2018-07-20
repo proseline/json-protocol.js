@@ -31,14 +31,25 @@ module.exports = function(options) {
   messageNames.sort().forEach(function(name, index) {
     var options = messages[name];
     assert(options.hasOwnProperty("schema"), "message type must have schema");
+    if (options.hasOwnProperty("verify")) {
+      assert.equal(
+        typeof options.verify,
+        "function",
+        "verify must be Function"
+      );
+    }
     var schema = options.schema;
     var valid = ajv.compile(schema);
     var prefix = index + 1; // Reserve prefix 0 for handshakes.
     messageTypePrefixes.push(prefix);
     messageTypesByName[name] = messageTypesByPrefix[prefix] = {
       name: name,
-      schema: schema,
       valid: valid,
+      verify:
+        options.verify ||
+        function() {
+          return true;
+        },
       prefix: prefix
     };
     Protocol.prototype[name] = function(data, callback) {
@@ -196,6 +207,7 @@ module.exports = function(options) {
     var type = messageTypesByName[typeName];
     try {
       assert(type.valid(data));
+      assert(type.verify(data));
     } catch (error) {
       var moreInformativeError = new Error("invalid " + typeName);
       moreInformativeError.errors = type.valid.errors;
@@ -254,7 +266,7 @@ module.exports = function(options) {
       return callback();
     }
     var type = messageTypesByPrefix[prefix];
-    if (!type || !type.valid(body)) {
+    if (!type || !type.valid(body) || !type.verify(body)) {
       this.emit("invalid", body);
       return callback();
     }

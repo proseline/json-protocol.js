@@ -135,11 +135,36 @@ tape("double handshake", function(test) {
 tape("invalid message", function(test) {
   var replicationKey = randomReplicationKey();
   var anna = FruitProtocol({ replicationKey });
+  test.throws(
+    function() {
+      anna.apple("orange", function() {
+        /* pass */
+      });
+    },
+    "invalid apple",
+    "invalid apple"
+  );
+  test.end();
+});
+
+tape("verify", function(test) {
+  var ProtocolWithValid = makeProtocol({
+    version: 1,
+    messages: {
+      hello: {
+        schema: { type: "string" },
+        verify: function(body) {
+          return body === "hello";
+        }
+      }
+    }
+  });
+  var anna = ProtocolWithValid({ replicationKey: randomReplicationKey() });
   test.throws(function() {
-    anna.apple("orange", function() {
+    anna.hello("howdy", function() {
       /* pass */
     });
-  }, "invalid apple");
+  }, "invalid hello");
   test.end();
 });
 
