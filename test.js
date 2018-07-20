@@ -91,3 +91,22 @@ tape("version conflict", function(test) {
 
   anna.pipe(bob).pipe(anna);
 });
+
+tape("invalid message", function(test) {
+  var Protocol = makeProtocol({
+    version: 1,
+    messages: { apple: { schema: { type: "string", const: "apple" } } }
+  });
+
+  var replicationKey = Buffer.alloc(32);
+  sodium.randombytes_buf(replicationKey);
+
+  var anna = Protocol({ replicationKey });
+  test.throws(function() {
+    anna.apple("orange", function() {
+      /* pass */
+    });
+  }, "invalid apple");
+
+  test.end();
+});

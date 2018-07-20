@@ -156,10 +156,16 @@ module.exports = function(options) {
   };
 
   Protocol.prototype._sendMessage = function(typeName, data, callback) {
-    assert(types.hasOwnProperty(typeName));
-    assert.equal(typeof callback, "function");
+    assert(types.hasOwnProperty(typeName), "unknown message type: " + typeName);
+    assert.equal(typeof callback, "function", "callback must be function");
     var type = types[typeName];
-    assert(type.valid(data));
+    try {
+      assert(type.valid(data));
+    } catch (error) {
+      var moreInformativeError = new Error("invalid " + typeName);
+      moreInformativeError.errors = type.valid.errors;
+      throw moreInformativeError;
+    }
     this._encode(type.prefix, data, callback);
   };
 
