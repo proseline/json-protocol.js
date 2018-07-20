@@ -25,17 +25,17 @@ module.exports = function(options) {
   assert(messageNames.length !== 0, "messages must have properties");
 
   var ajv = new AJV();
-  var types = {};
-  var typesByPrefix = {};
-  var prefixes = [0];
+  var messageTypesByName = {};
+  var messageTypesByPrefix = {};
+  var messageTypePrefixes = [0];
   messageNames.sort().forEach(function(name, index) {
     var options = messages[name];
     assert(options.hasOwnProperty("schema"), "message type must have schema");
     var schema = options.schema;
     var valid = ajv.compile(schema);
     var prefix = index + 1; // Reserve prefix 0 for handshakes.
-    prefixes.push(prefix);
-    types[name] = typesByPrefix[prefix] = {
+    messageTypePrefixes.push(prefix);
+    messageTypesByName[name] = messageTypesByPrefix[prefix] = {
       name: name,
       schema: schema,
       valid: valid,
@@ -45,31 +45,50 @@ module.exports = function(options) {
       this._sendMessage(name, data, callback);
     };
   });
-  var validMessage = ajv.compile({
+
+  var validTuple = ajv.compile({
+    title: "Protocol Message",
     type: "array",
     items: [
-      { type: "number", enum: prefixes },
       {
+        title: "Message Type Prefix",
+        type: "number",
+        enum: messageTypePrefixes
+      },
+      {
+        title: "Message Payload"
         /* anything */
       }
     ],
     additionalItems: false
   });
+
   var validHandshake = ajv.compile({
+    title: "Handshake Message",
     type: "object",
     properties: {
-      version: { type: "number", multipleOf: 1, minimum: 1 },
-      nonce: { type: "string", pattern: "^[a-f0-9]{48}$" }
+      version: {
+        title: "Protocol Version",
+        type: "number",
+        multipleOf: 1,
+        minimum: 1
+      },
+      nonce: {
+        title: "Encryption Nonce",
+        type: "string",
+        pattern: "^[a-f0-9]{" + STREAM_NONCEBYTES * 2 + "}$"
+      }
     },
     required: ["version", "nonce"],
     additionalProperties: false
   });
 
   function Protocol(options) {
-    if (!(this instanceof Protocol)) return new Protocol(options);
     assert.equal(typeof options, "object", "argument must be object");
-    var self = this;
-    var replicationKey = (self._replicationKey = options.replicationKey);
+
+    if (!(this instanceof Protocol)) return new Protocol(options);
+
+    var replicationKey = (this._replicationKey = options.replicationKey);
     assert(Buffer.isBuffer(replicationKey), "replicationKey must be Buffer");
     assert.equal(
       replicationKey.byteLength,
@@ -77,13 +96,14 @@ module.exports = function(options) {
       "replicationKey must be crypto_stream_KEYBYTES long"
     );
 
-    self._initializeReadable();
-    self._initializeWritable();
-    Duplexify.call(self, self._writableStream, self._readableStream);
+    this._initializeReadable();
+    this._initializeWritable();
+    Duplexify.call(this, this._writableStream, this._readableStream);
   }
 
   Protocol.prototype._initializeReadable = function() {
     var self = this;
+
     // Cryptographic stream using our nonce and the secret key.
     self._sendingNonce = Buffer.alloc(STREAM_NONCEBYTES);
     sodium.randombytes_buf(self._sendingNonce);
@@ -91,7 +111,9 @@ module.exports = function(options) {
       self._sendingNonce,
       self._replicationKey
     );
+
     self._encoderStream = lengthPrefixedStream.encode();
+
     self._readableStream = through2.obj(function(chunk, _, done) {
       assert(Buffer.isBuffer(chunk));
       // Once we've sent our nonce, encrypt.
@@ -101,6 +123,7 @@ module.exports = function(options) {
       this.push(chunk);
       done();
     });
+
     self._encoderStream
       .pipe(self._readableStream)
       .once("error", function(error) {
@@ -110,10 +133,12 @@ module.exports = function(options) {
 
   Protocol.prototype._initializeWritable = function() {
     var self = this;
+
     // Cryptographic stream using our peer's nonce, which we've yet
     // to receive, and the secret key.
     self._receivingNonce = null;
     self._receivingCipher = null;
+
     self._writableStream = through2(function(chunk, encoding, done) {
       assert(Buffer.isBuffer(chunk));
       // Once we've been given a nonce, decrypt.
@@ -123,12 +148,14 @@ module.exports = function(options) {
       // Until we've been given a nonce, write in the clear.
       done(null, chunk);
     });
+
     self._parserStream = through2.obj(function(chunk, _, done) {
       self._parse(chunk, function(error) {
         if (error) return done(error);
         done();
       });
     });
+
     self._writableStream
       .pipe(lengthPrefixedStream.decode())
       .pipe(self._parserStream)
@@ -137,6 +164,7 @@ module.exports = function(options) {
       });
   };
 
+  // Send our handshake message.
   Protocol.prototype.handshake = function(callback) {
     assert.equal(typeof callback, "function");
     var self = this;
@@ -155,10 +183,17 @@ module.exports = function(options) {
     );
   };
 
+  // Send a protocol-defined message.
+  //
+  // The constructor adds functions to the prototype for sending each
+  // message type, which call this function in turn.
   Protocol.prototype._sendMessage = function(typeName, data, callback) {
-    assert(types.hasOwnProperty(typeName), "unknown message type: " + typeName);
+    assert(
+      messageTypesByName.hasOwnProperty(typeName),
+      "unknown message type: " + typeName
+    );
     assert.equal(typeof callback, "function", "callback must be function");
-    var type = types[typeName];
+    var type = messageTypesByName[typeName];
     try {
       assert(type.valid(data));
     } catch (error) {
@@ -182,8 +217,9 @@ module.exports = function(options) {
     });
   };
 
-  Protocol.prototype._encode = function(prefix, data, callback) {
-    var buffer = Buffer.from(JSON.stringify([prefix, data]), "utf8");
+  Protocol.prototype._encode = function(prefix, body, callback) {
+    var tuple = [prefix, body];
+    var buffer = Buffer.from(JSON.stringify(tuple), "utf8");
     this._encoderStream.write(buffer, callback);
   };
 
@@ -193,8 +229,8 @@ module.exports = function(options) {
     } catch (error) {
       return callback(error);
     }
-    if (!validMessage(parsed)) {
-      return callback(new Error("invalid message"));
+    if (!validTuple(parsed)) {
+      return callback(new Error("invalid tuple"));
     }
     var prefix = parsed[0];
     var body = parsed[1];
@@ -217,7 +253,7 @@ module.exports = function(options) {
       this.emit("handshake");
       return callback();
     }
-    var type = typesByPrefix[prefix];
+    var type = messageTypesByPrefix[prefix];
     if (!type || !type.valid(body)) {
       this.emit("invalid", body);
       return callback();
