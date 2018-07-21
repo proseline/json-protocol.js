@@ -19,7 +19,7 @@ var appleAndOrangeMessages = {
 
 var FruitProtocol = makeProtocol({
   version: 1,
-  encryption: true,
+  encrypt: true,
   messages: appleAndOrangeMessages
 });
 
@@ -29,7 +29,7 @@ tape("apple and orange", function(test) {
 
 var UnencryptedFruitProtocol = makeProtocol({
   version: 1,
-  encryption: false,
+  encrypt: false,
   messages: appleAndOrangeMessages
 });
 
@@ -39,8 +39,8 @@ tape("unencrypted apple and orange", function(test) {
 
 var SignedFruitProtocol = makeProtocol({
   version: 1,
-  encryption: false,
-  signing: true,
+  encrypt: false,
+  sign: true,
   messages: appleAndOrangeMessages
 });
 
@@ -50,8 +50,8 @@ tape("signed apple and orange", function(test) {
 
 var EncryptedSignedFruitProtocol = makeProtocol({
   version: 1,
-  encryption: true,
-  signing: true,
+  encrypt: true,
+  sign: true,
   messages: appleAndOrangeMessages
 });
 
@@ -65,7 +65,7 @@ function testAppleAndOrange(protocol, test) {
   var replicationKey = randomReplicationKey();
   var seed = randomSeed();
 
-  var anna = FruitProtocol({ replicationKey, seed });
+  var anna = protocol({ replicationKey, seed });
   anna.handshake(function(error) {
     test.ifError(error, "anna sent handshake");
   });
@@ -79,7 +79,7 @@ function testAppleAndOrange(protocol, test) {
     });
   });
 
-  var bob = FruitProtocol({ replicationKey, seed });
+  var bob = protocol({ replicationKey, seed });
   bob.handshake(function(error) {
     test.ifError(error, "bob sent handshake");
   });
@@ -131,13 +131,13 @@ tape("version conflict", function(test) {
 
   var Version1 = makeProtocol({
     version: 1,
-    encryption: true,
+    encrypt: true,
     messages: { hello: { schema: { type: "string", const: "hello" } } }
   });
 
   var Version2 = makeProtocol({
     version: 2,
-    encryption: true,
+    encrypt: true,
     messages: { howdy: { schema: { type: "string", const: "howdy" } } }
   });
 
@@ -192,7 +192,7 @@ tape("invalid message", function(test) {
 tape("verify", function(test) {
   var ProtocolWithValid = makeProtocol({
     version: 1,
-    encryption: true,
+    encrypt: true,
     messages: {
       hello: {
         schema: { type: "string" },
