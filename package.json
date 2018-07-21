@@ -1,9 +1,9 @@
 {
-  "name": "encrypted-json-protocol",
-  "version": "1.0.0",
-  "description": "create Node.js steams for encrypted, JSON-message protocols",
+  "name": "json-protocol",
+  "version": "0.0.0",
+  "description": "create Node.js steams for JSON-message protocols",
   "author": "Kyle E. Mitchell <kyle@kemitchell.com> (https://kemitchell.com/)",
-  "repository": "proseline/encrypted-json-protocol.js",
+  "repository": "proseline/json-protocol.js",
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "ajv": "^6.5.2",
