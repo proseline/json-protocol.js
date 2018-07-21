@@ -50,6 +50,7 @@ module.exports = function(options) {
   // Set flags for optional encryption features.
   var encrypt = options.encrypt
   var sign = options.sign
+  var requireSigningKeys = options.requireSigningKeys
 
   var version = options.version
   assert.equal(typeof version, 'number', 'version must be Number')
@@ -202,7 +203,7 @@ module.exports = function(options) {
         this.secretKey,
         seed
       )
-    } else if (sign) {
+    } else if (sign || requireSigningKeys) {
       assert.fail('must provide secretKey and publicKey or seed')
     }
 
