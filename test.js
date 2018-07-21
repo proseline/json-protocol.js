@@ -62,10 +62,10 @@ tape("encrypted and signed apple and orange", function(test) {
 function testAppleAndOrange(protocol, test) {
   test.plan(8);
 
-  var replicationKey = randomReplicationKey();
+  var encryptionKey = randomEncryptionKey();
   var seed = randomSeed();
 
-  var anna = protocol({ replicationKey, seed });
+  var anna = protocol({ encryptionKey, seed });
   anna.handshake(function(error) {
     test.ifError(error, "anna sent handshake");
   });
@@ -79,7 +79,7 @@ function testAppleAndOrange(protocol, test) {
     });
   });
 
-  var bob = protocol({ replicationKey, seed });
+  var bob = protocol({ encryptionKey, seed });
   bob.handshake(function(error) {
     test.ifError(error, "bob sent handshake");
   });
@@ -99,9 +99,9 @@ function testAppleAndOrange(protocol, test) {
 tape("multiple messages", function(test) {
   test.plan(6);
 
-  var replicationKey = randomReplicationKey();
+  var encryptionKey = randomEncryptionKey();
 
-  var anna = FruitProtocol({ replicationKey });
+  var anna = FruitProtocol({ encryptionKey });
   anna.handshake(function(error) {
     test.ifError(error, "anna sent handshake");
     anna.on("apple", function() {
@@ -112,7 +112,7 @@ tape("multiple messages", function(test) {
     });
   });
 
-  var bob = FruitProtocol({ replicationKey });
+  var bob = FruitProtocol({ encryptionKey });
   bob.handshake(function(error) {
     test.ifError(error, "bob sent handshake");
     bob.apple("apple", function(error) {
@@ -141,9 +141,9 @@ tape("version conflict", function(test) {
     messages: { howdy: { schema: { type: "string", const: "howdy" } } }
   });
 
-  var replicationKey = randomReplicationKey();
+  var encryptionKey = randomEncryptionKey();
 
-  var anna = Version1({ replicationKey }).once("error", function(error) {
+  var anna = Version1({ encryptionKey }).once("error", function(error) {
     test.equal(error.message, "version mismatch");
     test.equal(error.version, 2);
   });
@@ -151,7 +151,7 @@ tape("version conflict", function(test) {
     test.ifError(error, "anna sent handshake");
   });
 
-  var bob = Version2({ replicationKey }).once("error", function(error) {
+  var bob = Version2({ encryptionKey }).once("error", function(error) {
     test.equal(error.message, "version mismatch");
     test.equal(error.version, 1);
   });
@@ -163,8 +163,8 @@ tape("version conflict", function(test) {
 });
 
 tape("double handshake", function(test) {
-  var replicationKey = randomReplicationKey();
-  var anna = FruitProtocol({ replicationKey });
+  var encryptionKey = randomEncryptionKey();
+  var anna = FruitProtocol({ encryptionKey });
   anna.handshake(function(error) {
     test.ifError(error);
     anna.handshake(function(error) {
@@ -175,8 +175,8 @@ tape("double handshake", function(test) {
 });
 
 tape("invalid message", function(test) {
-  var replicationKey = randomReplicationKey();
-  var anna = FruitProtocol({ replicationKey });
+  var encryptionKey = randomEncryptionKey();
+  var anna = FruitProtocol({ encryptionKey });
   test.throws(
     function() {
       anna.apple("orange", function() {
@@ -202,7 +202,7 @@ tape("verify", function(test) {
       }
     }
   });
-  var anna = ProtocolWithValid({ replicationKey: randomReplicationKey() });
+  var anna = ProtocolWithValid({ encryptionKey: randomEncryptionKey() });
   test.throws(function() {
     anna.hello("howdy", function() {
       /* pass */
@@ -220,7 +220,7 @@ tape("signed without keys", function(test) {
   });
   test.throws(
     function() {
-      SignedProtocol({ replicationKey: randomReplicationKey() });
+      SignedProtocol({ encryptionKey: randomEncryptionKey() });
     },
     /must provide/,
     "throws on init"
@@ -255,13 +255,13 @@ tape("encrypted without key", function(test) {
     function() {
       EncryptedProtocol({ seed: randomSeed() });
     },
-    /replicationKey/,
+    /encryptionKey/,
     "throws on init"
   );
   test.end();
 });
 
-function randomReplicationKey() {
+function randomEncryptionKey() {
   var key = Buffer.alloc(32);
   sodium.randombytes_buf(key);
   return key;

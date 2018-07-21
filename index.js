@@ -5,7 +5,7 @@ var inherits = require("inherits");
 var lengthPrefixedStream = require("length-prefixed-stream");
 var sodium = require("sodium-universal");
 var strictSchema = require("strict-json-object-schema");
-var stringify = require("fast-json-stable-stringify");
+var stableStringify = require("fast-json-stable-stringify");
 var through2 = require("through2");
 
 var STREAM_NONCEBYTES = sodium.crypto_stream_NONCEBYTES;
@@ -18,9 +18,36 @@ var SECRETKEYBYTES = sodium.crypto_sign_SECRETKEYBYTES;
 
 var HANDSHAKE_PREFIX = 0;
 
+// Implementation Overview
+//
+// json-protocol builds duplex streams that read and write
+// JSON-encoded messages. Each message across the write is
+// encoded as an array. The first element is a positive
+// integer Number prefix indicating the type of the message
+// data payload. The last element is the JSON-encoded
+// message data payload.
+//
+// When cryptographic signing is enabled for the protocol,
+// tuples contain a second element: a hex-encoded Ed25519
+// signature of the stringified message data payload. We use
+// a "stable" JSON stringifier that sorts object properties
+// by key, so that equal JSON structures stringify the same,
+// and peers can reliably verify signatures.
+//
+// Each protocol reserves prefix `0` for handshake messages.
+// Handshakes exchange at least protocol versions. Protocol
+// versions mismatches produce errors.
+//
+// When the protocol is encrypted, handshake messages also
+// exchange random stream cipher nonces. Having sent a
+// stream-cipher nonce, each peer sends all subsequent
+// messages enciphered with the nonce and a key shared
+// out-of-band.
+
 module.exports = function(options) {
   assert.equal(typeof options, "object", "argument must be Object");
 
+  // Set flags for optional encryption features.
   var encrypt = options.encrypt;
   var sign = options.sign;
 
@@ -29,15 +56,18 @@ module.exports = function(options) {
   assert(version > 0, "version must be greater than zero");
   assert(Number.isSafeInteger(version), "version must be safe integer");
 
+  // Turn message specification into message types and compile schemas.
   var messages = options.messages;
   assert.equal(typeof messages, "object", "messages must be Object");
   var messageNames = Object.keys(messages);
   assert(messageNames.length !== 0, "messages must have properties");
-
   var ajv = new AJV();
+  // Map message types from name so we can access them from methods.
   var messageTypesByName = {};
+  // Map message types from prefix so we can validate them quickly.
   var messageTypesByPrefix = {};
-  var messageTypePrefixes = [0];
+  // List prefixes for use in our schema for tuples.
+  var messageTypePrefixes = [HANDSHAKE_PREFIX];
   messageNames.sort().forEach(function(name, index) {
     var options = messages[name];
     assert(options.hasOwnProperty("schema"), "message type must have schema");
@@ -55,11 +85,7 @@ module.exports = function(options) {
     messageTypesByName[name] = messageTypesByPrefix[prefix] = {
       name: name,
       valid: valid,
-      verify:
-        options.verify ||
-        function() {
-          return true;
-        },
+      verify: options.verify || returnTrue,
       prefix: prefix
     };
     Protocol.prototype[name] = function(data, callback) {
@@ -67,6 +93,8 @@ module.exports = function(options) {
     };
   });
 
+  // Build a validation predicate for message tuples using a
+  // JSON Schema.
   var tupleItems = [
     {
       title: "Message Type Prefix",
@@ -74,7 +102,6 @@ module.exports = function(options) {
       enum: messageTypePrefixes
     }
   ];
-
   if (sign) {
     tupleItems.push({
       title: "Signature",
@@ -82,9 +109,7 @@ module.exports = function(options) {
       pattern: "^[a-f0-9]{128}$"
     });
   }
-
   tupleItems.push({ title: "Message Payload" });
-
   var validTuple = ajv.compile({
     title: "Protocol Message",
     type: "array",
@@ -92,6 +117,8 @@ module.exports = function(options) {
     additionalItems: false
   });
 
+  // Build a validation predicate for handshake message
+  // bodies using a JSON Schema.
   var handshakeProperties = {
     version: {
       title: "Protocol Version",
@@ -109,24 +136,27 @@ module.exports = function(options) {
   }
   var validHandshake = ajv.compile(strictSchema(handshakeProperties));
 
+  // Prototype for duplex streams to return to the caller.
   function Protocol(options) {
     assert.equal(typeof options, "object", "argument must be object");
 
     if (!(this instanceof Protocol)) return new Protocol(options);
 
+    // Require encryption key for encrypted protocols.
     if (encrypt) {
       assert(
-        Buffer.isBuffer(options.replicationKey),
-        "replicationKey must be Buffer"
+        Buffer.isBuffer(options.encryptionKey),
+        "encryptionKey must be Buffer"
       );
       assert.equal(
-        options.replicationKey.byteLength,
+        options.encryptionKey.byteLength,
         STREAM_KEYBYTES,
-        "replicationKey must be crypto_stream_KEYBYTES long"
+        "encryptionKey must be crypto_stream_KEYBYTES long"
       );
-      this._replicationKey = options.replicationKey;
+      this._encryptionKey = options.encryptionKey;
     }
 
+    // Require a key pair or seed for signed protocols.
     if (sign) {
       if (
         options.hasOwnProperty("publicKey") &&
@@ -167,16 +197,19 @@ module.exports = function(options) {
     Duplexify.call(this, this._writableStream, this._readableStream);
   }
 
+  // Initialize the readable half of the duplex stream, for
+  // sending messages to our peer.
   Protocol.prototype._initializeReadable = function() {
     var self = this;
 
     if (encrypt) {
-      // Cryptographic stream using our nonce and the secret key.
+      // Cryptographic stream using our nonce and the
+      // shared encryption key.
       self._sendingNonce = Buffer.alloc(STREAM_NONCEBYTES);
       sodium.randombytes_buf(self._sendingNonce);
       self._sendingCipher = initializeCipher(
         self._sendingNonce,
-        self._replicationKey
+        self._encryptionKey
       );
     }
 
@@ -188,8 +221,8 @@ module.exports = function(options) {
       if (encrypt && self._sentHandshake) {
         self._sendingCipher.update(chunk, chunk);
       }
-      this.push(chunk);
-      done();
+      // Until we send a nonce, write in the clear.
+      done(null, chunk);
     });
 
     self._encoderStream
@@ -199,12 +232,14 @@ module.exports = function(options) {
       });
   };
 
+  // Initialize the readable half of the duplex stream, for
+  // receiving messages from our peer.
   Protocol.prototype._initializeWritable = function() {
     var self = this;
 
     if (encrypt) {
       // Cryptographic stream using our peer's nonce, which we've yet
-      // to receive, and the secret key.
+      // to receive, and the shared encryption key.
       self._receivingNonce = null;
       self._receivingCipher = null;
     }
@@ -265,7 +300,7 @@ module.exports = function(options) {
       assert(type.verify(data));
     } catch (error) {
       var moreInformativeError = new Error("invalid " + typeName);
-      moreInformativeError.errors = type.valid.errors;
+      moreInformativeError.validationErrors = type.valid.errors;
       throw moreInformativeError;
     }
     this._encode(type.prefix, data, callback);
@@ -286,29 +321,38 @@ module.exports = function(options) {
     });
   };
 
+  // Encode a message tuple.
   Protocol.prototype._encode = function(prefix, data, callback) {
     var tuple = [prefix];
-    var dataBuffer = Buffer.from(stringify(data), "utf8");
     if (sign) {
+      var dataBuffer = Buffer.from(stableStringify(data), "utf8");
       var signature = Buffer.alloc(SIGN_BYTES);
       sodium.crypto_sign_detached(signature, dataBuffer, this._secretKey);
       tuple.push(signature.toString("hex"));
     }
     tuple.push(data);
     this._encoderStream.write(
+      // Note that we use built-in JSON.stringify, not
+      // stable stringify. Our peer can stable-stringify the
+      // message body to verify signature.
       Buffer.from(JSON.stringify(tuple), "utf8"),
       callback
     );
   };
 
+  // Check a tuple's signature.
   Protocol.prototype._validSignature = function(signature, data) {
     return sodium.crypto_sign_verify_detached(
       Buffer.from(signature, "hex"),
-      Buffer.from(stringify(data)),
+      // Note that we use stable-stringify for verifying
+      // signatures. JSON.stringify could serialize object
+      // properties in any order.
+      Buffer.from(stableStringify(data)),
       Buffer.from(this._publicKey, "hex")
     );
   };
 
+  // Parse a message tuple.
   Protocol.prototype._parse = function(message, callback) {
     try {
       var parsed = JSON.parse(message);
@@ -318,7 +362,10 @@ module.exports = function(options) {
     if (!validTuple(parsed)) {
       return callback(new Error("invalid tuple"));
     }
+    // The first tuple element is always the type prefix.
     var prefix = parsed[0];
+    // If we're signing, the second element will be a signature.
+    // Message body always comes last.
     var body, signature;
     if (sign) {
       signature = parsed[1];
@@ -326,7 +373,13 @@ module.exports = function(options) {
     } else {
       body = parsed[1];
     }
-    if (prefix === 0 && validHandshake(body)) {
+
+    // Handle handshake messages.
+    if (prefix === HANDSHAKE_PREFIX) {
+      if (!validHandshake(body)) {
+        this.emit("invalid", body);
+        return callback();
+      }
       if (version !== body.version) {
         var error = new Error("version mismatch");
         error.version = body.version;
@@ -337,7 +390,7 @@ module.exports = function(options) {
         assert.equal(this._receivingNonce.byteLength, STREAM_NONCEBYTES);
         this._receivingCipher = initializeCipher(
           this._receivingNonce,
-          this._replicationKey
+          this._encryptionKey
         );
         this.emit("handshake");
         return callback();
@@ -345,16 +398,20 @@ module.exports = function(options) {
       this.emit("handshake");
       return callback();
     }
+
+    // Check signatures.
     if (sign && !this._validSignature(signature, body)) {
       return callback(new Error("invalid signature"));
     }
+
+    // Handle protocol-defined message types.
     var type = messageTypesByPrefix[prefix];
     if (!type || !type.valid(body) || !type.verify(body)) {
       this.emit("invalid", body);
       return callback();
     }
     this.emit(type.name, body);
-    return callback();
+    callback();
   };
 
   inherits(Protocol, Duplexify);
@@ -368,4 +425,8 @@ function initializeCipher(nonce, secretKey) {
   assert(Buffer.isBuffer(secretKey));
   assert.equal(secretKey.byteLength, STREAM_KEYBYTES);
   return sodium.crypto_stream_xor_instance(nonce, secretKey);
+}
+
+function returnTrue() {
+  return true;
 }
