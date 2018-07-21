@@ -377,24 +377,24 @@ module.exports = function(options) {
     // Handle handshake messages.
     if (prefix === HANDSHAKE_PREFIX) {
       if (!validHandshake(body)) {
-        this.emit("invalid", body);
-        return callback();
+        return callback(new Error("invalid handshake"));
       }
       if (version !== body.version) {
         var error = new Error("version mismatch");
         error.version = body.version;
         return callback(error);
       }
-      if (encrypt && !this._receivingCipher) {
+      if (this._receivedHandshake) {
+        return callback(new Error("extra handshake"));
+      }
+      if (encrypt) {
         this._receivingNonce = Buffer.from(body.nonce, "hex");
-        assert.equal(this._receivingNonce.byteLength, STREAM_NONCEBYTES);
         this._receivingCipher = initializeCipher(
           this._receivingNonce,
           this._encryptionKey
         );
-        this.emit("handshake");
-        return callback();
       }
+      this._receivedHandshake = true;
       this.emit("handshake");
       return callback();
     }
@@ -407,8 +407,10 @@ module.exports = function(options) {
     // Handle protocol-defined message types.
     var type = messageTypesByPrefix[prefix];
     if (!type || !type.valid(body) || !type.verify(body)) {
-      this.emit("invalid", body);
-      return callback();
+      var error = new Error("invalid message body");
+      error.prefix = prefix;
+      error.body = body;
+      return callback(error);
     }
     this.emit(type.name, body);
     callback();
