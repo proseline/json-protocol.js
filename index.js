@@ -21,8 +21,8 @@ var HANDSHAKE_PREFIX = 0;
 module.exports = function(options) {
   assert.equal(typeof options, "object", "argument must be Object");
 
-  var encryption = options.encryption;
-  var signing = options.signing;
+  var encrypt = options.encrypt;
+  var sign = options.sign;
 
   var version = options.version;
   assert.equal(typeof version, "number", "version must be Number");
@@ -75,7 +75,7 @@ module.exports = function(options) {
     }
   ];
 
-  if (signing) {
+  if (sign) {
     tupleItems.push({
       title: "Signature",
       type: "string",
@@ -100,7 +100,7 @@ module.exports = function(options) {
       minimum: 1
     }
   };
-  if (encryption) {
+  if (encrypt) {
     handshakeProperties.nonce = {
       title: "Encryption Nonce",
       type: "string",
@@ -114,7 +114,7 @@ module.exports = function(options) {
 
     if (!(this instanceof Protocol)) return new Protocol(options);
 
-    if (encryption) {
+    if (encrypt) {
       assert(
         Buffer.isBuffer(options.replicationKey),
         "replicationKey must be Buffer"
@@ -127,7 +127,7 @@ module.exports = function(options) {
       this._replicationKey = options.replicationKey;
     }
 
-    if (signing) {
+    if (sign) {
       if (
         options.hasOwnProperty("publicKey") &&
         options.hasOwnProperty("secretKey")
@@ -170,7 +170,7 @@ module.exports = function(options) {
   Protocol.prototype._initializeReadable = function() {
     var self = this;
 
-    if (encryption) {
+    if (encrypt) {
       // Cryptographic stream using our nonce and the secret key.
       self._sendingNonce = Buffer.alloc(STREAM_NONCEBYTES);
       sodium.randombytes_buf(self._sendingNonce);
@@ -185,7 +185,7 @@ module.exports = function(options) {
     self._readableStream = through2.obj(function(chunk, _, done) {
       assert(Buffer.isBuffer(chunk));
       // Once we've sent our nonce, encrypt.
-      if (encryption && self._sentHandshake) {
+      if (encrypt && self._sentHandshake) {
         self._sendingCipher.update(chunk, chunk);
       }
       this.push(chunk);
@@ -202,7 +202,7 @@ module.exports = function(options) {
   Protocol.prototype._initializeWritable = function() {
     var self = this;
 
-    if (encryption) {
+    if (encrypt) {
       // Cryptographic stream using our peer's nonce, which we've yet
       // to receive, and the secret key.
       self._receivingNonce = null;
@@ -212,7 +212,7 @@ module.exports = function(options) {
     self._writableStream = through2(function(chunk, encoding, done) {
       assert(Buffer.isBuffer(chunk));
       // Once we've been given a nonce, decrypt.
-      if (encryption && self._receivingCipher) {
+      if (encrypt && self._receivingCipher) {
         self._receivingCipher.update(chunk, chunk);
       }
       // Until we've been given a nonce, write in the clear.
@@ -241,7 +241,7 @@ module.exports = function(options) {
     if (self._sentHandshake)
       return callback(new Error("already sent handshake"));
     var body = { version: version };
-    if (encryption) body.nonce = self._sendingNonce.toString("hex");
+    if (encrypt) body.nonce = self._sendingNonce.toString("hex");
     self._encode(HANDSHAKE_PREFIX, body, function(error) {
       if (error) return callback(error);
       self._sentHandshake = true;
@@ -277,7 +277,7 @@ module.exports = function(options) {
     self._finalize(function(error) {
       if (error) return self.destroy(error);
       self._encoderStream.end(callback);
-      if (encryption) {
+      if (encrypt) {
         self._sendingCipher.final();
         self._sendingCipher = null;
         self._receivingCipher.final();
@@ -289,7 +289,7 @@ module.exports = function(options) {
   Protocol.prototype._encode = function(prefix, data, callback) {
     var tuple = [prefix];
     var dataBuffer = Buffer.from(stringify(data), "utf8");
-    if (signing) {
+    if (sign) {
       var signature = Buffer.alloc(SIGN_BYTES);
       sodium.crypto_sign_detached(signature, dataBuffer, this._secretKey);
       tuple.push(signature.toString("hex"));
@@ -320,7 +320,7 @@ module.exports = function(options) {
     }
     var prefix = parsed[0];
     var body, signature;
-    if (signing) {
+    if (sign) {
       signature = parsed[1];
       body = parsed[2];
     } else {
@@ -332,7 +332,7 @@ module.exports = function(options) {
         error.version = body.version;
         return callback(error);
       }
-      if (encryption && !this._receivingCipher) {
+      if (encrypt && !this._receivingCipher) {
         this._receivingNonce = Buffer.from(body.nonce, "hex");
         assert.equal(this._receivingNonce.byteLength, STREAM_NONCEBYTES);
         this._receivingCipher = initializeCipher(
@@ -345,7 +345,7 @@ module.exports = function(options) {
       this.emit("handshake");
       return callback();
     }
-    if (signing && !this._validSignature(signature, body)) {
+    if (sign && !this._validSignature(signature, body)) {
       return callback(new Error("invalid signature"));
     }
     var type = messageTypesByPrefix[prefix];
