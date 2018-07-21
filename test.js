@@ -67,7 +67,7 @@ function testAppleAndOrange(protocol, test) {
   var encryptionKey = randomEncryptionKey()
   var seed = randomSeed()
 
-  var anna = protocol({ encryptionKey, seed })
+  var anna = protocol({encryptionKey, seed})
   anna.handshake(function(error) {
     test.ifError(error, 'anna sent handshake')
   })
@@ -81,7 +81,7 @@ function testAppleAndOrange(protocol, test) {
     })
   })
 
-  var bob = protocol({ encryptionKey, seed })
+  var bob = protocol({encryptionKey, seed})
   bob.handshake(function(error) {
     test.ifError(error, 'bob sent handshake')
   })
@@ -103,7 +103,7 @@ tape('multiple messages', function(test) {
 
   var encryptionKey = randomEncryptionKey()
 
-  var anna = FruitProtocol({ encryptionKey })
+  var anna = FruitProtocol({encryptionKey})
   anna.handshake(function(error) {
     test.ifError(error, 'anna sent handshake')
     anna.on('apple', function() {
@@ -114,7 +114,7 @@ tape('multiple messages', function(test) {
     })
   })
 
-  var bob = FruitProtocol({ encryptionKey })
+  var bob = FruitProtocol({encryptionKey})
   bob.handshake(function(error) {
     test.ifError(error, 'bob sent handshake')
     bob.apple('apple', function(error) {
@@ -135,7 +135,7 @@ tape('version conflict', function(test) {
     version: 1,
     encrypt: true,
     messages: {
-      hello: { schema: { type: 'string', const: 'hello' } },
+      hello: {schema: {type: 'string', const: 'hello'}},
     },
   })
 
@@ -143,15 +143,13 @@ tape('version conflict', function(test) {
     version: 2,
     encrypt: true,
     messages: {
-      howdy: { schema: { type: 'string', const: 'howdy' } },
+      howdy: {schema: {type: 'string', const: 'howdy'}},
     },
   })
 
   var encryptionKey = randomEncryptionKey()
 
-  var anna = Version1({ encryptionKey }).once('error', function(
-    error
-  ) {
+  var anna = Version1({encryptionKey}).once('error', function(error) {
     test.equal(error.message, 'version mismatch')
     test.equal(error.version, 2)
   })
@@ -159,9 +157,7 @@ tape('version conflict', function(test) {
     test.ifError(error, 'anna sent handshake')
   })
 
-  var bob = Version2({ encryptionKey }).once('error', function(
-    error
-  ) {
+  var bob = Version2({encryptionKey}).once('error', function(error) {
     test.equal(error.message, 'version mismatch')
     test.equal(error.version, 1)
   })
@@ -174,7 +170,7 @@ tape('version conflict', function(test) {
 
 tape('double handshake', function(test) {
   var encryptionKey = randomEncryptionKey()
-  var anna = FruitProtocol({ encryptionKey })
+  var anna = FruitProtocol({encryptionKey})
   anna.handshake(function(error) {
     test.ifError(error)
     anna.handshake(function(error) {
@@ -186,7 +182,7 @@ tape('double handshake', function(test) {
 
 tape('invalid message', function(test) {
   var encryptionKey = randomEncryptionKey()
-  var anna = FruitProtocol({ encryptionKey })
+  var anna = FruitProtocol({encryptionKey})
   test.throws(
     function() {
       anna.apple('orange', function() {
@@ -205,7 +201,7 @@ tape('verify', function(test) {
     encrypt: true,
     messages: {
       hello: {
-        schema: { type: 'string' },
+        schema: {type: 'string'},
         verify: function(body) {
           return body === 'hello'
         },
@@ -228,11 +224,11 @@ tape('signed without keys', function(test) {
     version: 1,
     encrypt: false,
     sign: true,
-    messages: { hello: { schema: { type: 'string' } } },
+    messages: {hello: {schema: {type: 'string'}}},
   })
   test.throws(
     function() {
-      SignedProtocol({ encryptionKey: randomEncryptionKey() })
+      SignedProtocol({encryptionKey: randomEncryptionKey()})
     },
     /must provide/,
     'throws on init'
@@ -245,7 +241,7 @@ tape('signed with key pair', function(test) {
     version: 1,
     encrypt: false,
     sign: true,
-    messages: { hello: { schema: { type: 'string' } } },
+    messages: {hello: {schema: {type: 'string'}}},
   })
   var keyPair = randomKeyPair()
   test.doesNotThrow(function() {
@@ -261,11 +257,11 @@ tape('encrypted without key', function(test) {
   var EncryptedProtocol = makeProtocol({
     version: 1,
     encrypt: true,
-    messages: { hello: { schema: { type: 'string' } } },
+    messages: {hello: {schema: {type: 'string'}}},
   })
   test.throws(
     function() {
-      EncryptedProtocol({ seed: randomSeed() })
+      EncryptedProtocol({seed: randomSeed()})
     },
     /encryptionKey/,
     'throws on init'
@@ -303,7 +299,7 @@ tape('invalid message', function(test) {
   })
   var lps = lengthPrefixedStream.encode()
   lps.pipe(instance)
-  lps.write(JSON.stringify({ prefix: 0, body: 'string' }))
+  lps.write(JSON.stringify({prefix: 0, body: 'string'}))
 })
 
 tape('extra handshake', function(test) {
@@ -314,8 +310,8 @@ tape('extra handshake', function(test) {
   })
   var lps = lengthPrefixedStream.encode()
   lps.pipe(instance)
-  lps.write(JSON.stringify([0, { version: 1 }]))
-  lps.write(JSON.stringify([0, { version: 1 }]))
+  lps.write(JSON.stringify([0, {version: 1}]))
+  lps.write(JSON.stringify([0, {version: 1}]))
 })
 
 tape('destroy', function(test) {

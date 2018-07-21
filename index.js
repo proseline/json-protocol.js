@@ -115,7 +115,7 @@ module.exports = function(options) {
       pattern: '^[a-f0-9]{128}$',
     })
   }
-  tupleItems.push({ title: 'Message Payload' })
+  tupleItems.push({title: 'Message Payload'})
   var validTuple = ajv.compile({
     title: 'Protocol Message',
     type: 'array',
@@ -291,7 +291,7 @@ module.exports = function(options) {
     var self = this
     if (self._sentHandshake)
       return callback(new Error('already sent handshake'))
-    var body = { version: version }
+    var body = {version: version}
     if (encrypt) body.nonce = self._sendingNonce.toString('hex')
     self._encode(HANDSHAKE_PREFIX, body, function(error) {
       /* istanbul ignore if */
