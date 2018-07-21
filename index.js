@@ -163,49 +163,47 @@ module.exports = function(options) {
     }
 
     // Require a key pair or seed for signed protocols.
-    if (sign) {
-      if (
-        options.hasOwnProperty('publicKey') &&
-        options.hasOwnProperty('secretKey')
-      ) {
-        assert(
-          Buffer.isBuffer(options.publicKey),
-          'publicKey must be Buffer'
-        )
-        assert.equal(
-          options.publicKey.byteLength,
-          PUBLICKEYBYTES,
-          'seed must be crypto_sign_PUBLICKEYBYTES long'
-        )
-        assert(
-          Buffer.isBuffer(options.secretKey),
-          'secretKey must be Buffer'
-        )
-        assert.equal(
-          options.secretKey.byteLength,
-          SECRETKEYBYTES,
-          'seed must be crypto_sign_SECRETKEYBYTES long'
-        )
-        this.publicKey = options.publicKey
-        this.secretKey = options.secretKey
-      } else if (options.hasOwnProperty('seed')) {
-        assert(Buffer.isBuffer(options.seed), 'seed must be Buffer')
-        assert.equal(
-          options.seed.byteLength,
-          SEEDBYTES,
-          'seed must be crypto_sign_SEEDBYTES long'
-        )
-        var seed = options.seed
-        this.publicKey = Buffer.alloc(PUBLICKEYBYTES)
-        this.secretKey = Buffer.alloc(SECRETKEYBYTES)
-        sodium.crypto_sign_seed_keypair(
-          this.publicKey,
-          this.secretKey,
-          seed
-        )
-      } else {
-        assert.fail('must provide secretKey and publicKey or seed')
-      }
+    if (
+      options.hasOwnProperty('publicKey') &&
+      options.hasOwnProperty('secretKey')
+    ) {
+      assert(
+        Buffer.isBuffer(options.publicKey),
+        'publicKey must be Buffer'
+      )
+      assert.equal(
+        options.publicKey.byteLength,
+        PUBLICKEYBYTES,
+        'seed must be crypto_sign_PUBLICKEYBYTES long'
+      )
+      assert(
+        Buffer.isBuffer(options.secretKey),
+        'secretKey must be Buffer'
+      )
+      assert.equal(
+        options.secretKey.byteLength,
+        SECRETKEYBYTES,
+        'seed must be crypto_sign_SECRETKEYBYTES long'
+      )
+      this.publicKey = options.publicKey
+      this.secretKey = options.secretKey
+    } else if (options.hasOwnProperty('seed')) {
+      assert(Buffer.isBuffer(options.seed), 'seed must be Buffer')
+      assert.equal(
+        options.seed.byteLength,
+        SEEDBYTES,
+        'seed must be crypto_sign_SEEDBYTES long'
+      )
+      var seed = options.seed
+      this.publicKey = Buffer.alloc(PUBLICKEYBYTES)
+      this.secretKey = Buffer.alloc(SECRETKEYBYTES)
+      sodium.crypto_sign_seed_keypair(
+        this.publicKey,
+        this.secretKey,
+        seed
+      )
+    } else if (sign) {
+      assert.fail('must provide secretKey and publicKey or seed')
     }
 
     this._initializeReadable()
