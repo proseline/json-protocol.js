@@ -2,25 +2,41 @@ var makeProtocol = require("./");
 var sodium = require("sodium-universal");
 var tape = require("tape");
 
-var FruitProtocol = makeProtocol({
-  version: 1,
-  messages: {
-    apple: {
-      schema: {
-        type: "string",
-        const: "apple"
-      }
-    },
-    orange: {
-      schema: {
-        type: "string",
-        const: "orange"
-      }
+var appleAndOrangeMessages = {
+  apple: {
+    schema: {
+      type: "string",
+      const: "apple"
+    }
+  },
+  orange: {
+    schema: {
+      type: "string",
+      const: "orange"
     }
   }
+};
+
+var FruitProtocol = makeProtocol({
+  version: 1,
+  messages: appleAndOrangeMessages
 });
 
 tape("apple and orange", function(test) {
+  testAppleAndOrange(FruitProtocol, test);
+});
+
+var UnencryptedFruitProtocol = makeProtocol({
+  version: 1,
+  noEncryption: false,
+  messages: appleAndOrangeMessages
+});
+
+tape("unencrypted apple and orange", function(test) {
+  testAppleAndOrange(UnencryptedFruitProtocol, test);
+});
+
+function testAppleAndOrange(protocol, test) {
   test.plan(8);
 
   var replicationKey = randomReplicationKey();
@@ -54,7 +70,7 @@ tape("apple and orange", function(test) {
   });
 
   anna.pipe(bob).pipe(anna);
-});
+}
 
 tape("multiple messages", function(test) {
   test.plan(6);

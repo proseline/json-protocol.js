@@ -4,6 +4,7 @@ var assert = require("assert");
 var inherits = require("inherits");
 var lengthPrefixedStream = require("length-prefixed-stream");
 var sodium = require("sodium-universal");
+var strictSchema = require("strict-json-object-schema");
 var through2 = require("through2");
 
 var STREAM_NONCEBYTES = sodium.crypto_stream_NONCEBYTES;
@@ -13,6 +14,8 @@ var HANDSHAKE_PREFIX = 0;
 
 module.exports = function(options) {
   assert.equal(typeof options, "object", "argument must be Object");
+
+  var encryption = !options.noEncryption;
 
   var version = options.version;
   assert.equal(typeof version, "number", "version must be Number");
@@ -74,38 +77,40 @@ module.exports = function(options) {
     additionalItems: false
   });
 
-  var validHandshake = ajv.compile({
-    title: "Handshake Message",
-    type: "object",
-    properties: {
-      version: {
-        title: "Protocol Version",
-        type: "number",
-        multipleOf: 1,
-        minimum: 1
-      },
-      nonce: {
-        title: "Encryption Nonce",
-        type: "string",
-        pattern: "^[a-f0-9]{" + STREAM_NONCEBYTES * 2 + "}$"
-      }
-    },
-    required: ["version", "nonce"],
-    additionalProperties: false
-  });
+  var handshakeProperties = {
+    version: {
+      title: "Protocol Version",
+      type: "number",
+      multipleOf: 1,
+      minimum: 1
+    }
+  };
+  if (encryption) {
+    handshakeProperties.nonce = {
+      title: "Encryption Nonce",
+      type: "string",
+      pattern: "^[a-f0-9]{" + STREAM_NONCEBYTES * 2 + "}$"
+    };
+  }
+  var validHandshake = ajv.compile(strictSchema(handshakeProperties));
 
   function Protocol(options) {
     assert.equal(typeof options, "object", "argument must be object");
 
     if (!(this instanceof Protocol)) return new Protocol(options);
 
-    var replicationKey = (this._replicationKey = options.replicationKey);
-    assert(Buffer.isBuffer(replicationKey), "replicationKey must be Buffer");
-    assert.equal(
-      replicationKey.byteLength,
-      STREAM_KEYBYTES,
-      "replicationKey must be crypto_stream_KEYBYTES long"
-    );
+    if (encryption) {
+      assert(
+        Buffer.isBuffer(options.replicationKey),
+        "replicationKey must be Buffer"
+      );
+      assert.equal(
+        options.replicationKey.byteLength,
+        STREAM_KEYBYTES,
+        "replicationKey must be crypto_stream_KEYBYTES long"
+      );
+      this._replicationKey = options.replicationKey;
+    }
 
     this._initializeReadable();
     this._initializeWritable();
@@ -115,20 +120,22 @@ module.exports = function(options) {
   Protocol.prototype._initializeReadable = function() {
     var self = this;
 
-    // Cryptographic stream using our nonce and the secret key.
-    self._sendingNonce = Buffer.alloc(STREAM_NONCEBYTES);
-    sodium.randombytes_buf(self._sendingNonce);
-    self._sendingCipher = initializeCipher(
-      self._sendingNonce,
-      self._replicationKey
-    );
+    if (encryption) {
+      // Cryptographic stream using our nonce and the secret key.
+      self._sendingNonce = Buffer.alloc(STREAM_NONCEBYTES);
+      sodium.randombytes_buf(self._sendingNonce);
+      self._sendingCipher = initializeCipher(
+        self._sendingNonce,
+        self._replicationKey
+      );
+    }
 
     self._encoderStream = lengthPrefixedStream.encode();
 
     self._readableStream = through2.obj(function(chunk, _, done) {
       assert(Buffer.isBuffer(chunk));
       // Once we've sent our nonce, encrypt.
-      if (self._sentNonce) {
+      if (encryption && self._sentHandshake) {
         self._sendingCipher.update(chunk, chunk);
       }
       this.push(chunk);
@@ -145,15 +152,17 @@ module.exports = function(options) {
   Protocol.prototype._initializeWritable = function() {
     var self = this;
 
-    // Cryptographic stream using our peer's nonce, which we've yet
-    // to receive, and the secret key.
-    self._receivingNonce = null;
-    self._receivingCipher = null;
+    if (encryption) {
+      // Cryptographic stream using our peer's nonce, which we've yet
+      // to receive, and the secret key.
+      self._receivingNonce = null;
+      self._receivingCipher = null;
+    }
 
     self._writableStream = through2(function(chunk, encoding, done) {
       assert(Buffer.isBuffer(chunk));
       // Once we've been given a nonce, decrypt.
-      if (self._receivingCipher) {
+      if (encryption && self._receivingCipher) {
         self._receivingCipher.update(chunk, chunk);
       }
       // Until we've been given a nonce, write in the clear.
@@ -179,19 +188,15 @@ module.exports = function(options) {
   Protocol.prototype.handshake = function(callback) {
     assert.equal(typeof callback, "function");
     var self = this;
-    if (self._sentNonce) return callback(new Error("already sent handshake"));
-    self._encode(
-      HANDSHAKE_PREFIX,
-      {
-        version: version,
-        nonce: self._sendingNonce.toString("hex")
-      },
-      function(error) {
-        if (error) return callback(error);
-        self._sentNonce = true;
-        callback();
-      }
-    );
+    if (self._sentHandshake)
+      return callback(new Error("already sent handshake"));
+    var body = { version: version };
+    if (encryption) body.nonce = self._sendingNonce.toString("hex");
+    self._encode(HANDSHAKE_PREFIX, body, function(error) {
+      if (error) return callback(error);
+      self._sentHandshake = true;
+      callback();
+    });
   };
 
   // Send a protocol-defined message.
@@ -222,10 +227,12 @@ module.exports = function(options) {
     self._finalize(function(error) {
       if (error) return self.destroy(error);
       self._encoderStream.end(callback);
-      self._sendingCipher.final();
-      self._sendingCipher = null;
-      self._receivingCipher.final();
-      self._receivingCipher = null;
+      if (encryption) {
+        self._sendingCipher.final();
+        self._sendingCipher = null;
+        self._receivingCipher.final();
+        self._receivingCipher = null;
+      }
     });
   };
 
@@ -252,7 +259,7 @@ module.exports = function(options) {
         error.version = body.version;
         return callback(error);
       }
-      if (!this._receivingCipher) {
+      if (encryption && !this._receivingCipher) {
         this._receivingNonce = Buffer.from(body.nonce, "hex");
         assert.equal(this._receivingNonce.byteLength, STREAM_NONCEBYTES);
         this._receivingCipher = initializeCipher(
