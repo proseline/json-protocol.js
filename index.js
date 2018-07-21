@@ -15,7 +15,7 @@ var HANDSHAKE_PREFIX = 0;
 module.exports = function(options) {
   assert.equal(typeof options, "object", "argument must be Object");
 
-  var encryption = !options.noEncryption;
+  var encryption = options.encryption;
 
   var version = options.version;
   assert.equal(typeof version, "number", "version must be Number");

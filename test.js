@@ -19,6 +19,7 @@ var appleAndOrangeMessages = {
 
 var FruitProtocol = makeProtocol({
   version: 1,
+  encryption: true,
   messages: appleAndOrangeMessages
 });
 
@@ -28,7 +29,7 @@ tape("apple and orange", function(test) {
 
 var UnencryptedFruitProtocol = makeProtocol({
   version: 1,
-  noEncryption: false,
+  encryption: false,
   messages: appleAndOrangeMessages
 });
 
@@ -107,11 +108,13 @@ tape("version conflict", function(test) {
 
   var Version1 = makeProtocol({
     version: 1,
+    encryption: true,
     messages: { hello: { schema: { type: "string", const: "hello" } } }
   });
 
   var Version2 = makeProtocol({
     version: 2,
+    encryption: true,
     messages: { howdy: { schema: { type: "string", const: "howdy" } } }
   });
 
@@ -166,6 +169,7 @@ tape("invalid message", function(test) {
 tape("verify", function(test) {
   var ProtocolWithValid = makeProtocol({
     version: 1,
+    encryption: true,
     messages: {
       hello: {
         schema: { type: "string" },
