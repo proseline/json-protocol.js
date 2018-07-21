@@ -85,12 +85,12 @@ module.exports = function(options) {
       )
     }
     var schema = options.schema
-    var valid = ajv.compile(schema)
+    var validate = ajv.compile(schema)
     var prefix = index + 1 // Reserve prefix 0 for handshakes.
     messageTypePrefixes.push(prefix)
     messageTypesByName[name] = messageTypesByPrefix[prefix] = {
       name: name,
-      valid: valid,
+      validate: validate,
       verify: options.verify || returnTrue,
       prefix: prefix,
     }
@@ -321,11 +321,11 @@ module.exports = function(options) {
     )
     var type = messageTypesByName[typeName]
     try {
-      assert(type.valid(data))
-      assert(type.verify.apply(this, data))
+      assert(type.validate(data))
+      assert(type.verify.call(this, data))
     } catch (error) {
       var moreInformativeError = new Error('invalid ' + typeName)
-      moreInformativeError.validationErrors = type.valid.errors
+      moreInformativeError.validationErrors = type.validate.errors
       throw moreInformativeError
     }
     this._encode(type.prefix, data, callback)
@@ -447,7 +447,7 @@ module.exports = function(options) {
 
     // Handle protocol-defined message types.
     var type = messageTypesByPrefix[prefix]
-    if (!type || !type.valid(body) || !type.verify(body)) {
+    if (!type || !type.validate(body) || !type.verify(body)) {
       var error = new Error('invalid message body')
       error.prefix = prefix
       error.body = body
