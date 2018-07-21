@@ -37,12 +37,35 @@ tape("unencrypted apple and orange", function(test) {
   testAppleAndOrange(UnencryptedFruitProtocol, test);
 });
 
+var SignedFruitProtocol = makeProtocol({
+  version: 1,
+  encryption: false,
+  signing: true,
+  messages: appleAndOrangeMessages
+});
+
+tape("signed apple and orange", function(test) {
+  testAppleAndOrange(SignedFruitProtocol, test);
+});
+
+var EncryptedSignedFruitProtocol = makeProtocol({
+  version: 1,
+  encryption: true,
+  signing: true,
+  messages: appleAndOrangeMessages
+});
+
+tape("encrypted and signed apple and orange", function(test) {
+  testAppleAndOrange(EncryptedSignedFruitProtocol, test);
+});
+
 function testAppleAndOrange(protocol, test) {
   test.plan(8);
 
   var replicationKey = randomReplicationKey();
+  var seed = randomSeed();
 
-  var anna = FruitProtocol({ replicationKey });
+  var anna = FruitProtocol({ replicationKey, seed });
   anna.handshake(function(error) {
     test.ifError(error, "anna sent handshake");
   });
@@ -56,7 +79,7 @@ function testAppleAndOrange(protocol, test) {
     });
   });
 
-  var bob = FruitProtocol({ replicationKey });
+  var bob = FruitProtocol({ replicationKey, seed });
   bob.handshake(function(error) {
     test.ifError(error, "bob sent handshake");
   });
@@ -192,4 +215,10 @@ function randomReplicationKey() {
   var key = Buffer.alloc(32);
   sodium.randombytes_buf(key);
   return key;
+}
+
+function randomSeed() {
+  var seed = Buffer.alloc(sodium.crypto_sign_SEEDBYTES);
+  sodium.randombytes_buf(seed);
+  return seed;
 }
