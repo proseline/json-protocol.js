@@ -211,6 +211,56 @@ tape("verify", function(test) {
   test.end();
 });
 
+tape("signed without keys", function(test) {
+  var SignedProtocol = makeProtocol({
+    version: 1,
+    encrypt: false,
+    sign: true,
+    messages: { hello: { schema: { type: "string" } } }
+  });
+  test.throws(
+    function() {
+      SignedProtocol({ replicationKey: randomReplicationKey() });
+    },
+    /must provide/,
+    "throws on init"
+  );
+  test.end();
+});
+
+tape("signed with key pair", function(test) {
+  var SignedProtocol = makeProtocol({
+    version: 1,
+    encrypt: false,
+    sign: true,
+    messages: { hello: { schema: { type: "string" } } }
+  });
+  var keyPair = randomKeyPair();
+  test.doesNotThrow(function() {
+    SignedProtocol({
+      publicKey: keyPair.publicKey,
+      secretKey: keyPair.secretKey
+    });
+  }, "no exception");
+  test.end();
+});
+
+tape("encrypted without key", function(test) {
+  var EncryptedProtocol = makeProtocol({
+    version: 1,
+    encrypt: true,
+    messages: { hello: { schema: { type: "string" } } }
+  });
+  test.throws(
+    function() {
+      EncryptedProtocol({ seed: randomSeed() });
+    },
+    /replicationKey/,
+    "throws on init"
+  );
+  test.end();
+});
+
 function randomReplicationKey() {
   var key = Buffer.alloc(32);
   sodium.randombytes_buf(key);
@@ -221,4 +271,13 @@ function randomSeed() {
   var seed = Buffer.alloc(sodium.crypto_sign_SEEDBYTES);
   sodium.randombytes_buf(seed);
   return seed;
+}
+
+function randomKeyPair() {
+  var keyPair = {
+    publicKey: Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES),
+    secretKey: Buffer.alloc(sodium.crypto_sign_SECRETKEYBYTES)
+  };
+  sodium.crypto_sign_keypair(keyPair.publicKey, keyPair.secretKey);
+  return keyPair;
 }
