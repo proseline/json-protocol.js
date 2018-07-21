@@ -186,8 +186,8 @@ module.exports = function(options) {
           SECRETKEYBYTES,
           'seed must be crypto_sign_SECRETKEYBYTES long'
         )
-        this._publicKey = options.publicKey
-        this._secretKey = options.secretKey
+        this.publicKey = options.publicKey
+        this.secretKey = options.secretKey
       } else if (options.hasOwnProperty('seed')) {
         assert(Buffer.isBuffer(options.seed), 'seed must be Buffer')
         assert.equal(
@@ -196,11 +196,11 @@ module.exports = function(options) {
           'seed must be crypto_sign_SEEDBYTES long'
         )
         var seed = options.seed
-        this._publicKey = Buffer.alloc(PUBLICKEYBYTES)
-        this._secretKey = Buffer.alloc(SECRETKEYBYTES)
+        this.publicKey = Buffer.alloc(PUBLICKEYBYTES)
+        this.secretKey = Buffer.alloc(SECRETKEYBYTES)
         sodium.crypto_sign_seed_keypair(
-          this._publicKey,
-          this._secretKey,
+          this.publicKey,
+          this.secretKey,
           seed
         )
       } else {
@@ -322,7 +322,7 @@ module.exports = function(options) {
     var type = messageTypesByName[typeName]
     try {
       assert(type.valid(data))
-      assert(type.verify(data))
+      assert(type.verify.apply(this, data))
     } catch (error) {
       var moreInformativeError = new Error('invalid ' + typeName)
       moreInformativeError.validationErrors = type.valid.errors
@@ -367,7 +367,7 @@ module.exports = function(options) {
       sodium.crypto_sign_detached(
         signature,
         dataBuffer,
-        this._secretKey
+        this.secretKey
       )
       tuple.push(signature.toString('hex'))
     }
@@ -389,7 +389,7 @@ module.exports = function(options) {
       // signatures. JSON.stringify could serialize object
       // properties in any order.
       Buffer.from(stableStringify(data)),
-      Buffer.from(this._publicKey, 'hex')
+      Buffer.from(this.publicKey, 'hex')
     )
   }
 
