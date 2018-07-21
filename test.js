@@ -1,3 +1,4 @@
+var lengthPrefixedStream = require("length-prefixed-stream");
 var makeProtocol = require("./");
 var sodium = require("sodium-universal");
 var tape = require("tape");
@@ -30,6 +31,7 @@ tape("apple and orange", function(test) {
 var UnencryptedFruitProtocol = makeProtocol({
   version: 1,
   encrypt: false,
+  sign: false,
   messages: appleAndOrangeMessages
 });
 
@@ -259,6 +261,51 @@ tape("encrypted without key", function(test) {
     "throws on init"
   );
   test.end();
+});
+
+tape("invalid handshake", function(test) {
+  var instance = UnencryptedFruitProtocol({});
+  instance.once("error", function(error) {
+    test.equal(error.message, "invalid handshake");
+    test.end();
+  });
+  var lps = lengthPrefixedStream.encode();
+  lps.pipe(instance);
+  lps.write(JSON.stringify([0, "blah"]));
+});
+
+tape("invalid JSON", function(test) {
+  var instance = UnencryptedFruitProtocol({});
+  instance.once("error", function(error) {
+    test.equal(error.message, "invalid JSON");
+    test.end();
+  });
+  var lps = lengthPrefixedStream.encode();
+  lps.pipe(instance);
+  lps.write("invalid");
+});
+
+tape("invalid message", function(test) {
+  var instance = UnencryptedFruitProtocol({});
+  instance.once("error", function(error) {
+    test.equal(error.message, "invalid tuple");
+    test.end();
+  });
+  var lps = lengthPrefixedStream.encode();
+  lps.pipe(instance);
+  lps.write(JSON.stringify({ prefix: 0, body: "string" }));
+});
+
+tape("extra handshake", function(test) {
+  var instance = UnencryptedFruitProtocol({});
+  instance.once("error", function(error) {
+    test.equal(error.message, "extra handshake");
+    test.end();
+  });
+  var lps = lengthPrefixedStream.encode();
+  lps.pipe(instance);
+  lps.write(JSON.stringify([0, { version: 1 }]));
+  lps.write(JSON.stringify([0, { version: 1 }]));
 });
 
 function randomEncryptionKey() {

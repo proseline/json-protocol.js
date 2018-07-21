@@ -278,6 +278,7 @@ module.exports = function(options) {
     var body = { version: version };
     if (encrypt) body.nonce = self._sendingNonce.toString("hex");
     self._encode(HANDSHAKE_PREFIX, body, function(error) {
+      /* istanbul ignore if */
       if (error) return callback(error);
       self._sentHandshake = true;
       callback();
@@ -357,7 +358,7 @@ module.exports = function(options) {
     try {
       var parsed = JSON.parse(message);
     } catch (error) {
-      return callback(error);
+      return callback(new Error("invalid JSON"));
     }
     if (!validTuple(parsed)) {
       return callback(new Error("invalid tuple"));
