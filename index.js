@@ -445,7 +445,11 @@ module.exports = function(options) {
 
     // Handle protocol-defined message types.
     var type = messageTypesByPrefix[prefix]
-    if (!type || !type.validate(body) || !type.verify(body)) {
+    if (
+      !type ||
+      !type.validate(body) ||
+      !type.verify.call(this, body)
+    ) {
       var error = new Error('invalid message body')
       error.prefix = prefix
       error.body = body
