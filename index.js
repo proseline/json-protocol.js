@@ -45,7 +45,9 @@ var HANDSHAKE_PREFIX = 0
 // out-of-band.
 
 module.exports = function(options) {
-  assert.equal(typeof options, 'object', 'argument must be Object')
+  if (encrypt || sign || requireSigningKeys) {
+    assert.equal(typeof options, 'object', 'argument must be Object')
+  }
 
   // Set flags for optional encryption features.
   var encrypt = options.encrypt
