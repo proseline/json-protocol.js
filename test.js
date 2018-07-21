@@ -318,6 +318,14 @@ tape('extra handshake', function(test) {
   lps.write(JSON.stringify([0, { version: 1 }]))
 })
 
+tape('destroy', function(test) {
+  var instance = UnencryptedFruitProtocol({})
+  test.doesNotThrow(function() {
+    instance.destroy()
+  }, 'does not throw')
+  test.end()
+})
+
 function randomEncryptionKey() {
   var key = Buffer.alloc(32)
   sodium.randombytes_buf(key)

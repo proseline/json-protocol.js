@@ -331,19 +331,31 @@ module.exports = function(options) {
     this._encode(type.prefix, data, callback)
   }
 
-  Protocol.prototype.finalize = function(callback) {
-    assert(typeof callback === 'function')
+  Protocol.prototype.destroy = function(error) {
     var self = this
-    self._finalize(function(error) {
-      if (error) return self.destroy(error)
-      self._encoderStream.end(callback)
-      if (encrypt) {
+    /* istanbul ignore if */
+    if (self.destroyed) return
+    self.destroyed = true
+    if (error) self.emit('error', error)
+    self._cleanup()
+    self.emit('close')
+  }
+
+  Protocol.prototype._cleanup = function() {
+    var self = this
+    self._encoderStream.end()
+    if (encrypt) {
+      /* istanbul ignore next */
+      if (self._sendingCipher) {
         self._sendingCipher.final()
         self._sendingCipher = null
+      }
+      /* istanbul ignore next */
+      if (self._receivingCipher) {
         self._receivingCipher.final()
         self._receivingCipher = null
       }
-    })
+    }
   }
 
   // Encode a message tuple.
