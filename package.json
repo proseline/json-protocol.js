@@ -1,6 +1,6 @@
 {
   "name": "json-protocol",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "create Node.js steams for JSON-message protocols",
   "author": "Kyle E. Mitchell <kyle@kemitchell.com> (https://kemitchell.com/)",
   "repository": "proseline/json-protocol.js",
