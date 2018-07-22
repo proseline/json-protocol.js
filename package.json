@@ -6,21 +6,21 @@
   "repository": "proseline/json-protocol.js",
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
-    "ajv": "^6.5.2",
-    "duplexify": "^3.6.0",
     "husky": "^0.14.3",
     "istanbul": "^0.4.5",
     "lint-staged": "^7.2.0",
     "prettier": "^1.13.7",
-    "sodium-universal": "^2.0.0",
-    "tape": "^4.9.1",
-    "through2": "^2.0.3"
+    "tape": "^4.9.1"
   },
   "dependencies": {
+    "ajv": "^6.5.2",
+    "duplexify": "^3.6.0",
     "fast-json-stable-stringify": "^2.0.0",
     "inherits": "^2.0.3",
     "length-prefixed-stream": "^1.6.0",
-    "strict-json-object-schema": "^1.1.0"
+    "sodium-universal": "^2.0.0",
+    "strict-json-object-schema": "^1.1.0",
+    "through2": "^2.0.3"
   },
   "scripts": {
     "coverage": "istanbul cover -- test.js",
