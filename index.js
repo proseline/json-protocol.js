@@ -220,6 +220,8 @@ module.exports = function(options) {
     Duplexify.call(this, this._writableStream, this._readableStream)
   }
 
+  inherits(Protocol, Duplexify)
+
   // Initialize the readable half of the duplex stream, for
   // sending messages to our peer.
   Protocol.prototype._initializeReadable = function() {
@@ -467,8 +469,6 @@ module.exports = function(options) {
     this.emit(type.name, body)
     callback()
   }
-
-  inherits(Protocol, Duplexify)
 
   return Protocol
 }
