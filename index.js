@@ -95,9 +95,6 @@ module.exports = function(options) {
       verify: options.verify || returnTrue,
       prefix: prefix,
     }
-    Protocol.prototype[name] = function(data, callback) {
-      this._sendMessage(name, data, callback)
-    }
   })
 
   // Build a validation predicate for message tuples using a
@@ -221,6 +218,12 @@ module.exports = function(options) {
   }
 
   inherits(Protocol, Duplexify)
+
+  messageNames.forEach(function(name) {
+    Protocol.prototype[name] = function(data, callback) {
+      this._sendMessage(name, data, callback)
+    }
+  })
 
   // Initialize the readable half of the duplex stream, for
   // sending messages to our peer.
