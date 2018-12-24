@@ -21,7 +21,7 @@ var HANDSHAKE_PREFIX = 0
 // Implementation Overview
 //
 // json-protocol builds duplex streams that read and write
-// JSON-encoded messages. Each message across the write is
+// JSON-encoded messages. Each message across the wire is
 // encoded as an array. The first element is a positive
 // integer Number prefix indicating the type of the message
 // data payload. The last element is the JSON-encoded
