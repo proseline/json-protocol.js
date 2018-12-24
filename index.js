@@ -36,7 +36,7 @@ var HANDSHAKE_PREFIX = 0
 //
 // Each protocol reserves prefix `0` for handshake messages.
 // Handshakes exchange at least protocol versions. Protocol
-// versions mismatches produce errors.
+// version mismatches produce errors.
 //
 // When the protocol is encrypted, handshake messages also
 // exchange random stream cipher nonces. Having sent a
