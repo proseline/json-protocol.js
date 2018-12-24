@@ -85,6 +85,28 @@ module.exports = function(options) {
         'verify must be Function'
       )
     }
+    if (options.hasOwnProperty('encrypt')) {
+      assert(
+        options.hasOwnProperty('decrypt'),
+        'decrypt must accompany encrypt'
+      )
+      assert.equal(
+        typeof options.encrypt,
+        'function',
+        'encrypt must be Function'
+      )
+    }
+    if (options.hasOwnProperty('decrypt')) {
+      assert(
+        options.hasOwnProperty('encrypt'),
+        'encrypt must accompany decrypt'
+      )
+      assert.equal(
+        typeof options.decrypt,
+        'function',
+        'decrypt must be Function'
+      )
+    }
     var schema = options.schema
     var validate = ajv.compile(schema)
     var prefix = index + 1 // Reserve prefix 0 for handshakes.
@@ -94,6 +116,8 @@ module.exports = function(options) {
       validate: validate,
       verify: options.verify || returnTrue,
       prefix: prefix,
+      encrypt: options.encrypt || returnArgument,
+      decrypt: options.decrypt || returnArgument,
     }
   })
 
@@ -340,7 +364,8 @@ module.exports = function(options) {
       moreInformativeError.validationErrors = type.validate.errors
       throw moreInformativeError
     }
-    this._encode(type.prefix, data, callback)
+    var encryptedData = type.encrypt.call(this, data)
+    this._encode(type.prefix, encryptedData, callback)
   }
 
   Protocol.prototype.destroy = function(error) {
@@ -459,17 +484,20 @@ module.exports = function(options) {
 
     // Handle protocol-defined message types.
     var type = messageTypesByPrefix[prefix]
+    if (!type) return invalidBody()
+    var decryptedBody = type.encrypt.call(this, body)
     if (
-      !type ||
-      !type.validate(body) ||
-      !type.verify.call(this, body)
-    ) {
+      !type.validate(decryptedBody) ||
+      !type.verify.call(this, decryptedBody)
+    )
+      return invalidBody()
+    function invalidBody() {
       var error = new Error('invalid message body')
       error.prefix = prefix
       error.body = body
       return callback(error)
     }
-    this.emit(type.name, body)
+    this.emit(type.name, decryptedBody)
     callback()
   }
 
@@ -486,4 +514,8 @@ function initializeCipher(nonce, secretKey) {
 
 function returnTrue() {
   return true
+}
+
+function returnArgument(argument) {
+  return argument
 }
