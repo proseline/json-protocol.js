@@ -20,7 +20,7 @@
     "length-prefixed-stream": "^1.6.0",
     "sodium-universal": "^2.0.0",
     "strict-json-object-schema": "^1.1.0",
-    "through2": "^2.0.3"
+    "through2": "^3.0.1"
   },
   "scripts": {
     "coverage": "istanbul cover -- test.js",
