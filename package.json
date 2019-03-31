@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "ajv": "^6.5.2",
-    "duplexify": "^3.6.0",
+    "duplexify": "^4.0.0",
     "fast-json-stable-stringify": "^2.0.0",
     "inherits": "^2.0.3",
     "length-prefixed-stream": "^1.6.0",
