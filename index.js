@@ -44,7 +44,7 @@ var HANDSHAKE_PREFIX = 0
 // messages enciphered with the nonce and a key shared
 // out-of-band.
 
-module.exports = function(options) {
+module.exports = function (options) {
   assert.strictEqual(
     typeof options,
     'object',
@@ -84,7 +84,7 @@ module.exports = function(options) {
   var messageTypesByPrefix = {}
   // List prefixes for use in our schema for tuples.
   var messageTypePrefixes = [HANDSHAKE_PREFIX]
-  messageNames.sort().forEach(function(name, index) {
+  messageNames.sort().forEach(function (name, index) {
     var options = messages[name]
     assert(
       options.hasOwnProperty('schema'),
@@ -105,7 +105,7 @@ module.exports = function(options) {
       name: name,
       validate: validate,
       verify: options.verify || returnTrue,
-      prefix: prefix,
+      prefix: prefix
     }
   })
 
@@ -115,22 +115,22 @@ module.exports = function(options) {
     {
       title: 'Message Type Prefix',
       type: 'number',
-      enum: messageTypePrefixes,
-    },
+      enum: messageTypePrefixes
+    }
   ]
   if (sign) {
     tupleItems.push({
       title: 'Signature',
       type: 'string',
-      pattern: '^[a-f0-9]{128}$',
+      pattern: '^[a-f0-9]{128}$'
     })
   }
-  tupleItems.push({title: 'Message Payload'})
+  tupleItems.push({ title: 'Message Payload' })
   var validTuple = ajv.compile({
     title: 'Protocol Message',
     type: 'array',
     items: tupleItems,
-    additionalItems: false,
+    additionalItems: false
   })
 
   // Build a validation predicate for handshake message
@@ -140,20 +140,20 @@ module.exports = function(options) {
       title: 'Protocol Version',
       type: 'number',
       multipleOf: 1,
-      minimum: 1,
-    },
+      minimum: 1
+    }
   }
   if (encrypt) {
     handshakeProperties.nonce = {
       title: 'Encryption Nonce',
       type: 'string',
-      pattern: '^[a-f0-9]{' + STREAM_NONCEBYTES * 2 + '}$',
+      pattern: '^[a-f0-9]{' + STREAM_NONCEBYTES * 2 + '}$'
     }
   }
   var validHandshake = ajv.compile(strictSchema(handshakeProperties))
 
   // Prototype for duplex streams to return to the caller.
-  function Protocol(options) {
+  function Protocol (options) {
     if (encrypt || sign || requireSigningKeys) {
       assert.strictEqual(
         typeof options,
@@ -231,15 +231,15 @@ module.exports = function(options) {
 
   inherits(Protocol, Duplexify)
 
-  messageNames.forEach(function(name) {
-    Protocol.prototype[name] = function(data, callback) {
+  messageNames.forEach(function (name) {
+    Protocol.prototype[name] = function (data, callback) {
       this._sendMessage(name, data, callback)
     }
   })
 
   // Initialize the readable half of the duplex stream, for
   // sending messages to our peer.
-  Protocol.prototype._initializeReadable = function() {
+  Protocol.prototype._initializeReadable = function () {
     var self = this
 
     if (encrypt) {
@@ -255,7 +255,7 @@ module.exports = function(options) {
 
     self._encoderStream = lengthPrefixedStream.encode()
 
-    self._readableStream = through2.obj(function(chunk, _, done) {
+    self._readableStream = through2.obj(function (chunk, _, done) {
       assert(Buffer.isBuffer(chunk))
       // Once we've sent our nonce, encrypt.
       if (encrypt && self._sentHandshake) {
@@ -267,14 +267,14 @@ module.exports = function(options) {
 
     self._encoderStream
       .pipe(self._readableStream)
-      .once('error', function(error) {
+      .once('error', function (error) {
         self.destroy(error)
       })
   }
 
   // Initialize the readable half of the duplex stream, for
   // receiving messages from our peer.
-  Protocol.prototype._initializeWritable = function() {
+  Protocol.prototype._initializeWritable = function () {
     var self = this
 
     if (encrypt) {
@@ -284,7 +284,7 @@ module.exports = function(options) {
       self._receivingCipher = null
     }
 
-    self._writableStream = through2(function(chunk, encoding, done) {
+    self._writableStream = through2(function (chunk, encoding, done) {
       assert(Buffer.isBuffer(chunk))
       // Once we've been given a nonce, decrypt.
       if (encrypt && self._receivingCipher) {
@@ -294,8 +294,8 @@ module.exports = function(options) {
       done(null, chunk)
     })
 
-    self._parserStream = through2.obj(function(chunk, _, done) {
-      self._parse(chunk, function(error) {
+    self._parserStream = through2.obj(function (chunk, _, done) {
+      self._parse(chunk, function (error) {
         if (error) return done(error)
         done()
       })
@@ -304,20 +304,19 @@ module.exports = function(options) {
     self._writableStream
       .pipe(lengthPrefixedStream.decode())
       .pipe(self._parserStream)
-      .once('error', function(error) {
+      .once('error', function (error) {
         self.destroy(error)
       })
   }
 
   // Send our handshake message.
-  Protocol.prototype.handshake = function(callback) {
+  Protocol.prototype.handshake = function (callback) {
     assert.strictEqual(typeof callback, 'function')
     var self = this
-    if (self._sentHandshake)
-      return callback(new Error('already sent handshake'))
-    var body = {version: version}
+    if (self._sentHandshake) { return callback(new Error('already sent handshake')) }
+    var body = { version: version }
     if (encrypt) body.nonce = self._sendingNonce.toString('hex')
-    self._encode(HANDSHAKE_PREFIX, body, function(error) {
+    self._encode(HANDSHAKE_PREFIX, body, function (error) {
       /* istanbul ignore if */
       if (error) return callback(error)
       self._sentHandshake = true
@@ -329,7 +328,7 @@ module.exports = function(options) {
   //
   // The constructor adds functions to the prototype for sending each
   // message type, which call this function in turn.
-  Protocol.prototype._sendMessage = function(
+  Protocol.prototype._sendMessage = function (
     typeName,
     data,
     callback
@@ -355,7 +354,7 @@ module.exports = function(options) {
     this._encode(type.prefix, data, callback)
   }
 
-  Protocol.prototype.destroy = function(error) {
+  Protocol.prototype.destroy = function (error) {
     var self = this
     /* istanbul ignore if */
     if (self.destroyed) return
@@ -365,7 +364,7 @@ module.exports = function(options) {
     self.emit('close')
   }
 
-  Protocol.prototype._cleanup = function() {
+  Protocol.prototype._cleanup = function () {
     var self = this
     self._encoderStream.end()
     if (encrypt) {
@@ -383,7 +382,7 @@ module.exports = function(options) {
   }
 
   // Encode a message tuple.
-  Protocol.prototype._encode = function(prefix, data, callback) {
+  Protocol.prototype._encode = function (prefix, data, callback) {
     var tuple = [prefix]
     if (sign) {
       var dataBuffer = Buffer.from(stableStringify(data), 'utf8')
@@ -406,7 +405,7 @@ module.exports = function(options) {
   }
 
   // Check a tuple's signature.
-  Protocol.prototype._validSignature = function(signature, data) {
+  Protocol.prototype._validSignature = function (signature, data) {
     return sodium.crypto_sign_verify_detached(
       Buffer.from(signature, 'hex'),
       // Note that we use stable-stringify for verifying
@@ -418,7 +417,7 @@ module.exports = function(options) {
   }
 
   // Parse a message tuple.
-  Protocol.prototype._parse = function(message, callback) {
+  Protocol.prototype._parse = function (message, callback) {
     try {
       var parsed = JSON.parse(message)
     } catch (error) {
@@ -476,10 +475,10 @@ module.exports = function(options) {
       !type.validate(body) ||
       !type.verify.call(this, body)
     ) {
-      var error = new Error('invalid message body')
-      error.prefix = prefix
-      error.body = body
-      return callback(error)
+      var messageBodyError = new Error('invalid message body')
+      messageBodyError.prefix = prefix
+      messageBodyError.body = body
+      return callback(messageBodyError)
     }
     this.emit(type.name, body)
     callback()
@@ -488,7 +487,7 @@ module.exports = function(options) {
   return Protocol
 }
 
-function initializeCipher(nonce, secretKey) {
+function initializeCipher (nonce, secretKey) {
   assert(Buffer.isBuffer(nonce))
   assert.strictEqual(nonce.byteLength, STREAM_NONCEBYTES)
   assert(Buffer.isBuffer(secretKey))
@@ -496,6 +495,6 @@ function initializeCipher(nonce, secretKey) {
   return sodium.crypto_stream_xor_instance(nonce, secretKey)
 }
 
-function returnTrue() {
+function returnTrue () {
   return true
 }
